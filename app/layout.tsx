@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import './globals.css';
+import './responsive-board.css';
 
 export const metadata: Metadata = {
   title: 'Ghala · Project Command Center',

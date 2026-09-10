@@ -1,11 +1,16 @@
+'use client';
+
 import { ExternalLink, Github, GitBranch, Star } from 'lucide-react';
+import { useLocale } from './LocaleProvider';
 import type { Project } from '@/types/project';
 
 export function ProjectCard({ project }: { project: Project }) {
+  const { locale, t } = useLocale();
   const synced = Boolean(project.github_repo_id || project.github_full_name);
   const chips = project.stack.length
     ? project.stack
     : [project.github_language, ...(project.github_topics ?? [])].filter(Boolean) as string[];
+  const dateLocale = locale === 'ar' ? 'ar-SA' : 'en-GB';
 
   return (
     <article className="project-card">
@@ -26,7 +31,7 @@ export function ProjectCard({ project }: { project: Project }) {
         <div className="github-meta">
           {project.github_language && <span>{project.github_language}</span>}
           {(project.github_stars ?? 0) > 0 && <span><Star size={11}/> {project.github_stars}</span>}
-          {project.github_updated_at && <span>GitHub updated {new Date(project.github_updated_at).toLocaleDateString('en-GB')}</span>}
+          {project.github_updated_at && <span>{t.updated} {new Date(project.github_updated_at).toLocaleDateString(dateLocale)}</span>}
         </div>
       )}
 
@@ -41,8 +46,8 @@ export function ProjectCard({ project }: { project: Project }) {
 
       {(project.live_url || project.github_url) && (
         <div className="links">
-          {project.live_url && <a href={project.live_url} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Live</a>}
-          {project.github_url && <a href={project.github_url} target="_blank" rel="noreferrer"><Github size={15}/> GitHub</a>}
+          {project.live_url && <a href={project.live_url} target="_blank" rel="noreferrer"><ExternalLink size={15}/>{t.live}</a>}
+          {project.github_url && <a href={project.github_url} target="_blank" rel="noreferrer"><Github size={15}/>{t.github}</a>}
         </div>
       )}
     </article>

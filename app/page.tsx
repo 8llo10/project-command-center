@@ -16,8 +16,8 @@ async function getProjects(): Promise<Project[]> {
     .select('*')
     .order('sort_order', { ascending: true });
 
-  if (error || !data?.length) return seedProjects;
-  return data as Project[];
+  if (error) return seedProjects;
+  return (data ?? []) as Project[];
 }
 
 export default async function Home() {

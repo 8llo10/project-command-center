@@ -5,6 +5,8 @@ export type ProjectStatus =
   | 'planned'
   | 'paused';
 
+export type ProjectHealth = 'healthy' | 'watch' | 'attention' | 'maintenance';
+
 export type Project = {
   id: string;
   name: string;
@@ -24,6 +26,17 @@ export type Project = {
   github_stars?: number;
   github_updated_at?: string | null;
   github_synced_at?: string | null;
+  github_pushed_at?: string | null;
+  github_open_issues?: number;
+  status_changed_at?: string | null;
+  last_reviewed_at?: string | null;
+  maintenance_interval_days?: number;
+  reminder_snoozed_until?: string | null;
+  last_reminder_at?: string | null;
+  health_score?: number;
+  health_label?: ProjectHealth;
+  health_reason?: string | null;
+  health_checked_at?: string | null;
   updated_at: string;
   sort_order: number;
 };

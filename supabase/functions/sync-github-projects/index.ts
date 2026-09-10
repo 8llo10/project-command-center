@@ -55,9 +55,7 @@ Deno.serve(async (req: Request) => {
       },
     );
 
-    if (!githubResponse.ok) {
-      throw new Error(`GitHub API failed: ${githubResponse.status}`);
-    }
+    if (!githubResponse.ok) throw new Error(`GitHub API failed: ${githubResponse.status}`);
 
     const repos = await githubResponse.json();
     const { data: existing, error: existingError } = await supabase
@@ -67,14 +65,10 @@ Deno.serve(async (req: Request) => {
     if (existingError) throw existingError;
 
     const byRepoId = new Map(
-      (existing ?? [])
-        .filter((project: any) => project.github_repo_id)
-        .map((project: any) => [String(project.github_repo_id), project]),
+      (existing ?? []).filter((p: any) => p.github_repo_id).map((p: any) => [String(p.github_repo_id), p]),
     );
     const byUrl = new Map(
-      (existing ?? [])
-        .filter((project: any) => project.github_url)
-        .map((project: any) => [String(project.github_url).toLowerCase(), project]),
+      (existing ?? []).filter((p: any) => p.github_url).map((p: any) => [String(p.github_url).toLowerCase(), p]),
     );
 
     let inserted = 0;
@@ -83,10 +77,7 @@ Deno.serve(async (req: Request) => {
     for (const repo of repos) {
       if (repo.fork || EXCLUDED_REPOS.has(repo.name)) continue;
 
-      const match =
-        byRepoId.get(String(repo.id)) ??
-        byUrl.get(String(repo.html_url).toLowerCase());
-
+      const match = byRepoId.get(String(repo.id)) ?? byUrl.get(String(repo.html_url).toLowerCase());
       const topics = Array.isArray(repo.topics) ? repo.topics : [];
       const githubFields = {
         github_repo_id: repo.id,
@@ -96,15 +87,14 @@ Deno.serve(async (req: Request) => {
         github_language: repo.language,
         github_topics: topics,
         github_stars: repo.stargazers_count ?? 0,
+        github_open_issues: repo.open_issues_count ?? 0,
+        github_pushed_at: repo.pushed_at ?? null,
         github_updated_at: repo.updated_at,
         github_synced_at: new Date().toISOString(),
       };
 
       if (match) {
-        const { error } = await supabase
-          .from('projects')
-          .update(githubFields)
-          .eq('id', match.id);
+        const { error } = await supabase.from('projects').update(githubFields).eq('id', match.id);
         if (error) throw error;
         updated++;
       } else {
@@ -122,22 +112,19 @@ Deno.serve(async (req: Request) => {
           sort_order: 100,
           ...githubFields,
         });
-
         if (error) throw error;
         inserted++;
       }
     }
 
-    return new Response(
-      JSON.stringify({ ok: true, inserted, updated, checked: repos.length }),
-      { status: 200, headers: { 'content-type': 'application/json' } },
-    );
+    return new Response(JSON.stringify({ ok: true, inserted, updated, checked: repos.length }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
-      { status: 500, headers: { 'content-type': 'application/json' } },
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
   }
 });

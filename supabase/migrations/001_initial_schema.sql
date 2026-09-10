@@ -1,5 +1,5 @@
 -- Project Command Center
--- Replace OWNER_EMAIL_HERE with the email that will own the admin panel.
+-- Owner-only admin access is restricted to: ghalaalhashmi80@gmail.com
 
 create table if not exists public.projects (
   id text primary key,
@@ -25,6 +25,11 @@ create table if not exists public.project_private_notes (
 alter table public.projects enable row level security;
 alter table public.project_private_notes enable row level security;
 
+-- Data API grants. RLS below still controls which rows/actions are allowed.
+grant select on table public.projects to anon, authenticated;
+grant insert, update, delete on table public.projects to authenticated;
+grant select, insert, update, delete on table public.project_private_notes to authenticated;
+
 create policy "public can read projects"
 on public.projects for select
 to anon, authenticated
@@ -33,36 +38,36 @@ using (true);
 create policy "owner can insert projects"
 on public.projects for insert
 to authenticated
-with check ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+with check (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can update projects"
 on public.projects for update
 to authenticated
-using ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE')
-with check ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+using (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com')
+with check (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can delete projects"
 on public.projects for delete
 to authenticated
-using ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+using (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can read private notes"
 on public.project_private_notes for select
 to authenticated
-using ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+using (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can insert private notes"
 on public.project_private_notes for insert
 to authenticated
-with check ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+with check (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can update private notes"
 on public.project_private_notes for update
 to authenticated
-using ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE')
-with check ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+using (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com')
+with check (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');
 
 create policy "owner can delete private notes"
 on public.project_private_notes for delete
 to authenticated
-using ((auth.jwt() ->> 'email') = 'OWNER_EMAIL_HERE');
+using (lower(auth.jwt() ->> 'email') = 'ghalaalhashmi80@gmail.com');

@@ -1,0 +1,85 @@
+name: Project Health Reminders
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public project activity and notify owner
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = '8llo10';
+            const reminderRepo = 'project-command-center';
+            const now = Date.now();
+            const staleDays = 21;
+            const cutoff = now - staleDays * 24 * 60 * 60 * 1000;
+
+            const response = await github.request('GET /users/{username}/repos', {
+              username: owner,
+              per_page: 100,
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            const stale = response.data
+              .filter(repo => !repo.fork && !repo.archived && repo.name !== reminderRepo)
+              .filter(repo => new Date(repo.pushed_at || repo.updated_at).getTime() < cutoff)
+              .sort((a, b) => new Date(a.pushed_at || a.updated_at) - new Date(b.pushed_at || b.updated_at))
+              .slice(0, 8);
+
+            if (!stale.length) {
+              core.info('No stale public projects found.');
+              return;
+            }
+
+            const stamp = new Date().toISOString().slice(0, 10);
+            const marker = '<!-- project-health-reminder -->';
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo: reminderRepo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const existing = openIssues.find(issue =>
+              !issue.pull_request && issue.body && issue.body.includes(marker)
+            );
+
+            const rows = stale.map(repo => {
+              const pushed = (repo.pushed_at || repo.updated_at || '').slice(0, 10);
+              const days = Math.floor((now - new Date(repo.pushed_at || repo.updated_at).getTime()) / 86400000);
+              return `- [ ] **${repo.name}** — ${days} days without a push · last activity ${pushed}\n  ${repo.html_url}`;
+            }).join('\n');
+
+            const body = `${marker}\n## Project health reminder · ${stamp}\n\nThese public projects have had no push for at least ${staleDays} days:\n\n${rows}\n\nReview, maintain, improve, pause, or archive anything that no longer needs active work.\n\n_Automatically refreshed by Project Command Center._`;
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo: reminderRepo,
+                issue_number: existing.number,
+                title: `🔔 Project health reminder · ${stamp}`,
+                body,
+                assignees: [owner]
+              });
+              core.info(`Updated reminder issue #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner,
+                repo: reminderRepo,
+                title: `🔔 Project health reminder · ${stamp}`,
+                body,
+                assignees: [owner]
+              });
+              core.info(`Created reminder issue #${created.data.number}`);
+            }

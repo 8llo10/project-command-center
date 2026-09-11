@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowRight, Clock, Languages, LogOut, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { Activity, ArrowRight, Clock, Languages, LockKeyhole, LogOut, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { seedProjects, statusOrder } from '@/lib/projects';
 import { healthReasonCopy, statusCopy } from '@/lib/i18n';
@@ -23,7 +23,7 @@ export default function AdminPage() {
   const ar = locale === 'ar';
   const supabase = useMemo(() => createClient(), []);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [loginEmail, setLoginEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [projects, setProjects] = useState<Project[]>(seedProjects);
   const [selected, setSelected] = useState<Project>(emptyProject);
@@ -34,7 +34,17 @@ export default function AdminPage() {
   useEffect(() => { if (!supabase || !isOwner) return; void loadProjects(); }, [supabase, isOwner]);
 
   async function loadProjects(){ if(!supabase)return; const {data,error}=await supabase.from('projects').select('*').order('sort_order'); if(error){setMessage(error.message);return;} setProjects((data??[]) as Project[]); }
-  async function sendMagicLink(e:FormEvent){e.preventDefault(); if(!supabase)return setMessage('Supabase unavailable'); if(loginEmail.trim().toLowerCase()!==OWNER_EMAIL)return setMessage(ar?'هذا البريد غير مصرح له بالدخول.':'This email is not authorized.'); const redirectTo=`${window.location.origin}/auth/callback?next=/admin`; const {error}=await supabase.auth.signInWithOtp({email:loginEmail,options:{emailRedirectTo:redirectTo}}); setMessage(error?error.message:(ar?'أرسلت لك رابط الدخول على البريد.':'Magic sign-in link sent.'));}
+  async function signInWithPassword(e:FormEvent){
+    e.preventDefault();
+    if(!supabase)return setMessage(ar?'تعذر الاتصال بنظام الدخول.':'Authentication is unavailable.');
+    setMessage('');
+    const { data, error } = await supabase.auth.signInWithPassword({ email: OWNER_EMAIL, password });
+    if(error){ setMessage(ar?'كلمة المرور غير صحيحة.':'Incorrect password.'); return; }
+    const email = data.user?.email ?? null;
+    if(email?.toLowerCase() !== OWNER_EMAIL){ await supabase.auth.signOut(); setMessage(ar?'غير مصرح بالدخول.':'Access denied.'); return; }
+    setUserEmail(email);
+    setPassword('');
+  }
   async function selectProject(project:Project){setSelected(project);setPrivateNote('');if(!supabase||!isOwner)return;const {data,error}=await supabase.from('project_private_notes').select('*').eq('project_id',project.id).maybeSingle();if(error){setMessage(error.message);return;}setPrivateNote((data as ProjectPrivateNote|null)?.note??'');}
   async function saveProject(e:FormEvent){e.preventDefault();if(!supabase||!isOwner)return setMessage(ar?'غير مصرح لك بالتعديل.':'Not authorized.');const id=selected.id.trim()||crypto.randomUUID();const payload={...selected,id,updated_at:new Date().toISOString()};const {error}=await supabase.from('projects').upsert(payload);if(error)return setMessage(error.message);const {error:noteError}=await supabase.from('project_private_notes').upsert({project_id:id,note:privateNote,updated_at:new Date().toISOString()});if(noteError)return setMessage(ar?`تم حفظ المشروع، لكن تعذر حفظ الملاحظة: ${noteError.message}`:`Project saved, but note failed: ${noteError.message}`);setMessage(ar?'تم الحفظ ✅':'Saved ✅');setSelected({...emptyProject,updated_at:new Date().toISOString()});setPrivateNote('');await loadProjects();}
   async function removeProject(id:string){if(!supabase||!isOwner||!confirm(ar?'حذف المشروع؟':'Delete project?'))return;const {error}=await supabase.from('projects').delete().eq('id',id);setMessage(error?error.message:(ar?'تم الحذف.':'Deleted.'));await loadProjects();}
@@ -49,7 +59,7 @@ export default function AdminPage() {
     healthy: projects.filter(p=>!p.health_label||p.health_label==='healthy').length,
   }), [projects]);
 
-  if(!userEmail)return <main className="admin-shell compact"><div className="top-inline"><Link href="/" className="back"><ArrowRight size={16}/>{ar?'العودة للموقع':'Back to site'}</Link><button className="locale-toggle" onClick={()=>setLocale(ar?'en':'ar')}><Languages size={15}/>{ar?'English':'العربية'}</button></div><section className="login-card"><p className="eyebrow">OWNER ONLY</p><h1>{ar?'لوحة التحكم':'Owner Console'}</h1><p>{ar?'الدخول محصور ببريد المالكة، والصلاحيات محمية أيضًا بسياسات RLS داخل قاعدة البيانات.':'Access is restricted to the owner email and enforced by database RLS policies.'}</p><form onSubmit={sendMagicLink}><input type="email" required placeholder="your@email.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}/><button>{ar?'إرسال رابط الدخول':'Send sign-in link'}</button></form>{message&&<p className="notice">{message}</p>}</section></main>;
+  if(!userEmail)return <main className="admin-shell compact"><div className="top-inline"><Link href="/" className="back"><ArrowRight size={16}/>{ar?'العودة للموقع':'Back to site'}</Link><button className="locale-toggle" onClick={()=>setLocale(ar?'en':'ar')}><Languages size={15}/>{ar?'English':'العربية'}</button></div><section className="login-card"><div className="icon-box"><LockKeyhole size={20}/></div><p className="eyebrow">OWNER ONLY</p><h1>{ar?'لوحة التحكم':'Owner Console'}</h1><p>{ar?'أدخلي كلمة المرور للدخول مباشرة إلى مركز قيادة المشاريع.':'Enter the owner password to open the project command center.'}</p><form onSubmit={signInWithPassword}><input type="password" required autoFocus autoComplete="current-password" placeholder={ar?'كلمة المرور':'Password'} value={password} onChange={e=>setPassword(e.target.value)}/><button type="submit">{ar?'دخول':'Sign in'}</button></form>{message&&<p className="notice">{message}</p>}</section></main>;
 
   if(!isOwner)return <main className="admin-shell compact"><Link href="/" className="back"><ArrowRight size={16}/>{ar?'العودة للموقع':'Back to site'}</Link><section className="login-card"><p className="eyebrow">ACCESS DENIED</p><h1>{ar?'غير مصرح':'Access denied'}</h1><p>{ar?'الحساب الحالي لا يملك صلاحية إدارة المشاريع.':'This account cannot manage projects.'}</p><button onClick={signOut}><LogOut size={15}/>{ar?'تسجيل الخروج':'Sign out'}</button></section></main>;
 
